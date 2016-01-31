@@ -8,9 +8,10 @@ package org.cyberiantiger.minecraft.instantreset;
  *
  * @author antony
  */
+@SuppressWarnings("serial")
 class CommandUsageException extends CommandException {
 
-    public CommandUsageException() {
+	public CommandUsageException() {
     }
     
 }

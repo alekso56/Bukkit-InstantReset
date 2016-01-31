@@ -29,13 +29,15 @@ import org.cyberiantiger.minecraft.unsafe.InstanceTools;
  * @author antony
  */
 public class InstantReset extends JavaPlugin {
-    private static final String COMMAND_NAME = "ir";
+    @SuppressWarnings("unused")
+	private static final String COMMAND_NAME = "ir";
 
     private Map<String, SubCommand> subcommands = new HashMap<String, SubCommand>();
 
     private File templateDir;
     private File worldDir;
     private boolean resetOnRestart;
+    private boolean resetIfNoPlayers;
     private final Map<String, InstantResetWorld> worlds = new HashMap<String, InstantResetWorld>();
     private final List<Hooks> hooks = new ArrayList<Hooks>();
     private final FilePurgeTask filePurger = new FilePurgeTask(this);
@@ -58,7 +60,8 @@ public class InstantReset extends JavaPlugin {
 
         subcommands.put("list", new ListSubCommand(this));
         subcommands.put("reset", new ResetSubCommand(this));
-
+        subcommands.put("reload", new ReloadSubCommand(this));
+        
         if (getServer().getPluginManager().isPluginEnabled("Multiverse-Core")) {
             hooks.add(new MultiverseCoreHooks(this));
         }
@@ -70,7 +73,8 @@ public class InstantReset extends JavaPlugin {
         templateDir = new File(getDataFolder(), config.getString("templatedir"));
         worldDir = new File(getDataFolder(), config.getString("worlddir"));
         resetOnRestart = config.getBoolean("resetOnRestart", false);
-
+        resetIfNoPlayers = config.getBoolean("resetIfNoPlayers", false);
+        
         templateDir.mkdirs();
         worldDir.mkdirs();
 
@@ -170,35 +174,37 @@ public class InstantReset extends JavaPlugin {
     }
     
     private Map<Player, Location> unloadWorld(InstantResetWorld world, boolean save) {
-        Map<Player, Location> players = new HashMap<Player, Location>();
-        World bukkitWorld = getServer().getWorld(world.getName());
-        if (bukkitWorld != null) {
-            for (Player player : bukkitWorld.getPlayers()) {
-                players.put(player, player.getLocation());
-                player.teleport(getServer().getWorlds().get(0).getSpawnLocation());
-            }
-            for (Hooks hook : hooks) {
-                try {
-                    hook.preUnload(world);
-                } catch (Exception e) {
-                    getLogger().log(Level.WARNING, "Error calling hook", e);
-                }
-            }
-            if (!getServer().unloadWorld(bukkitWorld, save)) {
-                for (Map.Entry<Player, Location> e : players.entrySet()) {
-                    e.getKey().teleport(e.getValue());
-                }
-                throw new IllegalStateException("Bukkit cowardly refused to unload the world: " + world.getName());
-            }
-            for (Hooks hook : hooks) {
-                try {
-                    hook.postUnload(world);
-                } catch (Exception e) {
-                    getLogger().log(Level.WARNING, "Error calling hook", e);
-                }
-            }
-        }
-        return players;
+    	Map<Player, Location> players = new HashMap<Player, Location>();
+    	World bukkitWorld = getServer().getWorld(world.getName());
+    	if (bukkitWorld != null) {
+    		for (Player player : bukkitWorld.getPlayers()) {
+    			players.put(player, player.getLocation());
+    			player.teleport(getServer().getWorlds().get(0).getSpawnLocation());
+    		}
+    		if(players.size() >= 1 && !this.resetIfNoPlayers || players.size() <= 0 && this.resetIfNoPlayers){
+    			for (Hooks hook : hooks) {
+    				try {
+    					hook.preUnload(world);
+    				} catch (Exception e) {
+    					getLogger().log(Level.WARNING, "Error calling hook", e);
+    				}
+    			}
+    			if (!getServer().unloadWorld(bukkitWorld, save)) {
+    				for (Map.Entry<Player, Location> e : players.entrySet()) {
+    					e.getKey().teleport(e.getValue());
+    				}
+    				throw new IllegalStateException("Bukkit cowardly refused to unload the world: " + world.getName());
+    			}
+    			for (Hooks hook : hooks) {
+    				try {
+    					hook.postUnload(world);
+    				} catch (Exception e) {
+    					getLogger().log(Level.WARNING, "Error calling hook", e);
+    				}
+    			}
+    		}
+    	}
+    	return players;
     }
 
     public void reloadWorld(InstantResetWorld world) {
@@ -213,12 +219,14 @@ public class InstantReset extends JavaPlugin {
     public void resetWorld(InstantResetWorld world) {
         world.checkValid();
         Map<Player, Location> players = unloadWorld(world, false);
+    	if(players.size() >= 1 && !this.resetIfNoPlayers || players.size() <= 0 && this.resetIfNoPlayers){
         world.createWorldSave();
         World bukkitWorld = loadWorld(world);
         for (Player player : players.keySet()) {
             player.teleport(bukkitWorld.getSpawnLocation());
         }
         filePurger.start();
+    	}
     }
 
     public InstantResetWorld getInstantResetWorld(String name) {

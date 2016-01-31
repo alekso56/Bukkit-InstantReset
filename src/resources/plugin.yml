@@ -15,7 +15,9 @@ commands:
     usage: |
         /<command> list 
         /<command> reset [world]
+        /<command> reload
     permission: instantreset
     aliases:
             - irreset
             - irlist
+            - irreload

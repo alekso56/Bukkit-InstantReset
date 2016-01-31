@@ -8,6 +8,7 @@ package org.cyberiantiger.minecraft.instantreset;
  *
  * @author antony
  */
+@SuppressWarnings("serial")
 class CommandException extends Exception {
 
     public CommandException() {
